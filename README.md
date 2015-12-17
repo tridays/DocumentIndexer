@@ -13,4 +13,4 @@
 * 对停用词去除、词干还原等无要求,但应实现最基本的词条化功能.例如:将所有非字母和非数字字符转换为空格,不考虑纯数字词项
 
 ## 系统结构
-![](https://github.com/UCASExcited/DocumentIndexer/resource/system_architecture.png)
+![](https://github.com/UCASExcited/DocumentIndexer/blob/master/resource/system_architecture.png)
