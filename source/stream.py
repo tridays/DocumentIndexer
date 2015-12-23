@@ -23,6 +23,9 @@ class TokenStream:
         self._term_position = -1
         self._token = Token()
 
+    def get_document_num(self):
+        return self._document_num
+
     def _next_file_path(self):
         """
         获取下一个文档文件的路径
@@ -107,8 +110,4 @@ class TokenStream:
 if __name__ == '__main__':
     file_dir = os.getcwd() + '/../data/document'
     di = TokenStream(file_dir)
-    while (di.is_empty() is False):
-        print di.is_empty()
-        ret = di.next_term_docid()
-        print ret
 

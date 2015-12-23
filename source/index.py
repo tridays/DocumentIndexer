@@ -1,25 +1,26 @@
 # -*- coding: utf-8 -*-
 __author__ = 'zhsl'
 import os
+import heapq
 import csv
-import struct
 from stream import TokenStream
 from gama_encode import Gama
+from dictionary import Dictionary
 
 
 class Index:
 
-    def __init__(self, document_path, max_block=5000):
+    def __init__(self, document_path, max_block=10000):
         self._dir_path = os.path.dirname(document_path)
         self._index_block_dir = os.path.join(self._dir_path, 'index_block')
         self._index_block_path = []
         self._token_stream = TokenStream(document_path)
         self._stream_is_empty = False
-        self._term_dic = {}
-        self._term_cnt = 0
-        self._inverted_index = []
         self._max_block = max_block
         return
+
+    def get_document_num(self):
+        return self._token_stream.get_document_num()
 
     def _spimi_invert(self):
         """
@@ -52,8 +53,62 @@ class Index:
         构建索引
         :return:
         """
-        index_block = 0
         # 构建索引块
+        print '\tPhase 1: create index block, each block has at most 10000 term-docids'
+        self._build_index_block()
+        # 合并每个索引块, 构建全局索引
+        print '\tPhase 2: merge each index block'
+        dic, inverted_index = self._build_global_index()
+        Dictionary.write_dictionary(dic, os.path.join(
+                                    self._dir_path, 'index/dictionary'))
+        Gama.write_inverted_index_encode(inverted_index, os.path.join(
+                                self._dir_path, 'index/doc_index_encode'))
+        return
+
+    def _build_global_index(self):
+        block_dic = []
+        block_doc_csv = []
+        for block_path in self._index_block_path:
+            with open(block_path + '_dic', 'r') as block_dic_file:
+                block_dic.append(Dictionary.decompression(block_dic_file.read()))
+            block_doc_csv.append(csv.reader(open(block_path + '_doc', 'r'), delimiter=' '))
+        dic_point = [0] * len(block_dic)
+        dic_heap = []
+        term_dic = []
+        term_doc = []
+        heapq.heapify(dic_heap)
+        while True:
+            flag = True
+            for i in range(len(block_dic)):
+                if dic_point[i] >= len(block_dic[i]):
+                    continue
+                flag = False
+                term = block_dic[i][dic_point[i]]
+                if term in dic_heap:
+                    continue
+                else:
+                    heapq.heappush(dic_heap, term)
+            if flag:
+                break
+            top_term = heapq.heappop(dic_heap)
+            term_dic.append(top_term)
+            term_row = []
+            for i in range(len(block_dic)):
+                if dic_point[i] >= len(block_dic[i]):
+                    continue
+                if block_dic[i][dic_point[i]] != top_term:
+                    continue
+                temp_block_row = block_doc_csv[i].next()
+                for x in temp_block_row:
+                    if int(x) in term_row:
+                        continue
+                    term_row.append(int(x))
+                dic_point[i] += 1
+            term_doc.append(term_row)
+        return term_dic, term_doc
+
+    def _build_index_block(self):
+        index_block = 0
         while True:
             term_dic, term_cnt, inverted_index = self._spimi_invert()
             index_block += 1
@@ -63,70 +118,14 @@ class Index:
                                     self._index_block_path[-1])
             if self._stream_is_empty:
                 break
-        # 合并每个索引块, 构建全局索引
-
-        return
 
     def _write_index_block(self, dictionary, inverted_index, index_block_path):
         dic_sorted = [(k, dictionary[k]) for k in sorted(dictionary.keys())]
         temp = [0] * len(dic_sorted)
         for i, (k, v) in enumerate(dic_sorted):
             temp[i] = inverted_index[v]
-        self._write_inverted_index_encode(temp, [k for k, v in dic_sorted],
-                                          index_block_path)
-
-    def _write_inverted_index_decode(self, inverted_index, dic_sorted,
-                                     file_path):
-        dic_compression = self._compression_dictionary(dic_sorted)
-        with open(file_path, 'w') as write_file:
-            write_file.writelines(dic_compression)
-        with open(file_path, 'a+') as write_file:
-            writer = csv.writer(write_file, delimiter=' ')
-            writer.writerows(inverted_index)
-
-    def _write_inverted_index_encode(self, inverted_index, dic_sorted,
-                                     file_path):
-        """
-        写入 Gama 编码的 inverted_index
-        :param inverted_index:
-        :param dic_sorted:
-        :param file_path:
-        :return:
-        """
-        dic_compression = self._compression_dictionary(dic_sorted)
-        with open(file_path, 'wb') as write_file:
-            write_file.writelines(dic_compression)
-            inverted_index_encode = Gama.encode_inverted_index(inverted_index)
-            temp = k = 0
-            for row in inverted_index_encode:
-                for x in row:
-                    temp |= (1 << k) if x == '1' else 0
-                    k += 1
-                    if k == 31:
-                        write_file.write(struct.pack('i', temp))
-                        temp = k = 0
-                k += 1
-                if k == 31:
-                    write_file.write(struct.pack('i', temp))
-                    temp = k = 0
-
-    def _compression_dictionary(self, dic_sorted):
-        """
-        压缩词典
-        :param dic_sorted:
-        :return:
-        """
-        ret = ''
-        for term in dic_sorted:
-            ret += str(len(term))
-            ret += term
-        return ret
-
-    def get_term_dic(self):
-        return self._term_dic
-
-    def get_inverted_index(self):
-        return self._inverted_index
+        Dictionary.write_dictionary([k for k, v in dic_sorted], index_block_path + '_dic')
+        Gama.write_inverted_index_decode(temp, index_block_path + '_doc')
 
 if __name__ == '__main__':
     file_dir = os.path.join(os.getcwd(), '../data/document')
