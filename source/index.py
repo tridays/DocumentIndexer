@@ -4,8 +4,9 @@ import os
 import heapq
 import csv
 from stream import TokenStream
-from gama_encode import Gama
+from gama_encode import Gamma
 from dictionary import Dictionary
+from statistic import Statistic
 
 
 class Index:
@@ -17,13 +18,19 @@ class Index:
         self._token_stream = TokenStream(document_path)
         self._stream_is_empty = False
         self._max_block = max_block
+        self._statistic = Statistic()
         return
 
     def get_document_num(self):
+        """
+        获取文档对应的编号
+        :return:
+        """
         return self._token_stream.get_document_num()
 
     def _spimi_invert(self):
         """
+        SPIMI 算法构建索引块
         single-pass in-memory indexing
         :return:
         """
@@ -36,6 +43,7 @@ class Index:
             if ret is None:
                 self._stream_is_empty = True
                 break
+            self._statistic.input_term_doc(ret[0], ret[-1])
             term, term_position, doc_id = ret
             if term not in term_dic:
                 term_dic[term] = term_cnt
@@ -50,7 +58,10 @@ class Index:
 
     def build_index(self):
         """
-        构建索引
+        构建文档的倒排记录表和词典, 通过 SPIMI 算法来构建
+        主要分为两个步骤: 1. 构建索引块  2. 合并索引块
+        在合并的时候, 写入磁盘的过程中, 对词典进行单一字符串的压缩,
+        对倒排记录表进行 Gamma 编码压缩
         :return:
         """
         # 构建索引块
@@ -61,11 +72,17 @@ class Index:
         dic, inverted_index = self._build_global_index()
         Dictionary.write_dictionary(dic, os.path.join(
                                     self._dir_path, 'index/dictionary'))
-        Gama.write_inverted_index_encode(inverted_index, os.path.join(
+        Gamma.write_inverted_index_encode(inverted_index, os.path.join(
                                 self._dir_path, 'index/doc_index_encode'))
         return
 
     def _build_global_index(self):
+        """
+        合并 SPIMI 算法第一步生成的索引块, 每次从磁盘中读取每个倒排记录表的一部分,
+        然后把相同词项的倒排记录合并, 然后维护一个优先队列, 为字典序优先级,
+        每次读取优先级最高的词项写入到磁盘中
+        :return:
+        """
         block_dic = []
         block_doc_csv = []
         for block_path in self._index_block_path:
@@ -108,6 +125,10 @@ class Index:
         return term_dic, term_doc
 
     def _build_index_block(self):
+        """
+        建立索引块
+        :return:
+        """
         index_block = 0
         while True:
             term_dic, term_cnt, inverted_index = self._spimi_invert()
@@ -120,12 +141,22 @@ class Index:
                 break
 
     def _write_index_block(self, dictionary, inverted_index, index_block_path):
+        """
+        把索引块写入到瓷盘中暂存
+        :param dictionary:
+        :param inverted_index:
+        :param index_block_path:
+        :return:
+        """
         dic_sorted = [(k, dictionary[k]) for k in sorted(dictionary.keys())]
         temp = [0] * len(dic_sorted)
         for i, (k, v) in enumerate(dic_sorted):
             temp[i] = inverted_index[v]
         Dictionary.write_dictionary([k for k, v in dic_sorted], index_block_path + '_dic')
-        Gama.write_inverted_index_decode(temp, index_block_path + '_doc')
+        Gamma.write_inverted_index_decode(temp, index_block_path + '_doc')
+
+    def get_statistic(self):
+        return self._statistic
 
 if __name__ == '__main__':
     file_dir = os.path.join(os.getcwd(), '../data/document')

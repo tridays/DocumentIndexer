@@ -3,7 +3,7 @@ __author__ = 'zhsl'
 import os
 from index import Index
 from dictionary import Dictionary
-from gama_encode import Gama
+from gama_encode import Gamma
 
 
 class Search:
@@ -17,6 +17,7 @@ class Search:
 
     def search(self, search_info):
         """
+        词项查找的主流程, 对查询内容分解
         :param search_info:
         :return:
         """
@@ -39,6 +40,11 @@ class Search:
         self._print_result(ret)
 
     def _print_result(self, ret):
+        """
+        输出查询结果
+        :param ret:
+        :return:
+        """
         if len(ret) == 0:
             print 'Sorry, No result!'
             return
@@ -47,15 +53,32 @@ class Search:
             print '\t%d: %s' % (x, self._document_num[x])
 
     def _search_reges(self, term):
+        """
+        查询词项是否存在词典中, 其中词典构建了 HASH 表,
+        能快速的查询到词项
+        :param term:
+        :return:
+        """
         if term in self._dic:
             return self._inverted_index[self._dic[term]]
         return []
 
     def _logic_process(self, result, logic):
+        """
+        对布尔查询的结果进行处理, 求每个查询词项的交集或者并集
+        :param result:
+        :param logic:
+        :return:
+        """
+        flag = 0
         ret = set()
         for row in result:
             if logic is '&':
-                ret &= row
+                if flag is 0:
+                    flag = 1
+                    ret = row
+                else:
+                    ret &= row
             elif logic is '|':
                 ret |= row
         return [ret]
@@ -70,10 +93,10 @@ if __name__ == '__main__':
     dic = Dictionary.read_dictionary(dic_path)
     document_num = ind.get_document_num()
     print document_num
-    inverted_index = Gama.reade_inverted_index_encode(inverted_index_path)
+    inverted_index = Gamma.reade_inverted_index_encode(inverted_index_path)
     engine = Search(dic, inverted_index, document_num)
     # abate, abide, abject, able
-    engin.search('  ab*te')
-    engin.search('abate')
-    engin.search('abate | a')
+    engine.search('  ab*te')
+    engine.search('abate')
+    engine.search('abate | a')
 
