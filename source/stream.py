@@ -5,6 +5,7 @@ import bs4
 from token_process import Token
 import re
 import json
+from statistic import Statistic
 
 class TokenStream:
 
@@ -22,6 +23,7 @@ class TokenStream:
         self._document_num = {}
         self._term_position = -1
         self._token = Token()
+        self._statistic = Statistic()
 
     def get_document_num(self):
         return self._document_num
@@ -68,6 +70,7 @@ class TokenStream:
         self._document_id += 1
         docno_name = self._document.docno.string
         self._document_num[self._document_id] = docno_name
+        self._statistic.input_term_doc(self._document_id, value=0)
         temp = ''
         for row in self._document.docno.next_siblings:
             if type(row) is bs4.element.Tag:
@@ -99,12 +102,16 @@ class TokenStream:
         ret = self._next_term()
         if ret is None:
             return None
+        self._statistic.input_term_doc(self._document_id, value=1)
         return (ret[0], ret[1], self._document_id)
 
     def ouput_document_num(self, file_path):
         file_path = os.path.join(file_path, 'document_num')
         with open(file_path, 'w') as writer_file:
             writer_file.write(json.dumps(self._document_num))
+
+    def get_statistic(self):
+        return self._statistic
 
 
 if __name__ == '__main__':

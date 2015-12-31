@@ -10,12 +10,12 @@ class Statistic:
         self._doc_term = {}
         return
 
-    def input_term_doc(self, term, doc):
+    def input_term_doc(self, doc, value=1):
         self._term_cnt += 1
         if doc not in self._doc_term:
             self._doc_cnt += 1
             self._doc_term[doc] = 0
-        self._doc_term[doc] += 1
+        self._doc_term[doc] += value
         return
 
     def display_statistic(self):

@@ -6,7 +6,6 @@ import csv
 from stream import TokenStream
 from gama_encode import Gamma
 from dictionary import Dictionary
-from statistic import Statistic
 
 
 class Index:
@@ -18,7 +17,6 @@ class Index:
         self._token_stream = TokenStream(document_path)
         self._stream_is_empty = False
         self._max_block = max_block
-        self._statistic = Statistic()
         return
 
     def get_document_num(self):
@@ -43,7 +41,6 @@ class Index:
             if ret is None:
                 self._stream_is_empty = True
                 break
-            self._statistic.input_term_doc(ret[0], ret[-1])
             term, term_position, doc_id = ret
             if term not in term_dic:
                 term_dic[term] = term_cnt
@@ -156,10 +153,11 @@ class Index:
         Gamma.write_inverted_index_decode(temp, index_block_path + '_doc')
 
     def get_statistic(self):
-        return self._statistic
+        return self._token_stream.get_statistic()
 
 if __name__ == '__main__':
     file_dir = os.path.join(os.getcwd(), '../data/document')
     ind = Index(file_dir)
     ind.build_index()
+
 
