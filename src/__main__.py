@@ -1,9 +1,6 @@
 __author__ = 'xp'
 
 import os
-print(os.environ)
-
-import os
 
 from src.term_provider import TermProvider
 from src.spimi_indexer import Indexer
